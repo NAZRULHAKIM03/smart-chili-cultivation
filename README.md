@@ -8,7 +8,7 @@ Built as the Integrated Design Project (IDP) at Universiti Malaysia Perlis (UniM
 
 > The project was completed in July 2025. This repository was organized and published in November 2026.
 
-![Demo video](https://youtu.be/kBlGtNVC3LU)
+[Demo video](https://youtu.be/kBlGtNVC3LU)
 ![Prototype](docs/images/prototype.png)
 
 ## What It Does
