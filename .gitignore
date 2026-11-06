@@ -1,0 +1,23 @@
+# Flask / Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.db
+*.sqlite3
+
+# Images captured by the ESP32-CAM
+server/**/uploads/
+*.jpg
+*.jpeg
+
+# Secrets
+secrets.h
+.env
+
+# ML data
+ml/dhenyd/
+ml/archive.zip
+
+# macOS
+.DS_Store
