@@ -1,0 +1,105 @@
+/* Image Analysis Section */
+.image-section {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin: 40px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.image-container {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.plant-image {
+    flex: 0 0 60%;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.plant-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.no-image {
+    text-align: center;
+    padding: 40px;
+    background: #f8fafc;
+    border-radius: 15px;
+    color: #718096;
+}
+
+/* Pressure Card Styling */
+.sensor-card.pressure::before {
+    background: linear-gradient(90deg, #f59e0b, #e17f26);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .image-container {
+        flex-direction: column;
+    }
+
+    .plant-image {
+        flex: 0 0 100%;
+    }
+}
+
+#alertsContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+}
+
+.alert {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+.alert.warning {
+    border-left: 4px solid #ffd700;
+}
+
+.alert.error {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+.alert-message {
+    margin-right: 15px;
+}
+
+.alert-close {
+    cursor: pointer;
+    font-size: 20px;
+    color: #666;
+}
+
+.alert-close:hover {
+    color: #333;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+} 

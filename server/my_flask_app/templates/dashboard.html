@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Chilli Farm Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        /* Add styles for the refresh countdown */
+        .refresh-countdown {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-countdown::before {
+            content: "🔄";
+            font-size: 1.1rem;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-countdown.refreshing::before {
+            animation: spin 1s linear infinite;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .sensors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .sensor-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sensor-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent-color);
+        }
+
+        .sensor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.15);
+        }
+
+        .sensor-card.temperature::before { background: linear-gradient(90deg, #ff6b6b, #ee5a52); }
+        .sensor-card.humidity::before { background: linear-gradient(90deg, #4ecdc4, #44a08d); }
+        .sensor-card.soil::before { background: linear-gradient(90deg, #8fbc8f, #228b22); }
+        .sensor-card.nutrients::before { background: linear-gradient(90deg, #f093fb, #f5576c); }
+        .sensor-card.light::before { background: linear-gradient(90deg, #ffd89b, #19547b); }
+        .sensor-card.pressure::before { background: linear-gradient(90deg, #f59e0b, #e17f26); }
+
+        .sensor-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sensor-icon {
+            font-size: 2.5rem;
+            margin-right: 15px;
+        }
+
+        .sensor-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .sensor-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 10px;
+        }
+
+        .nutrient-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .nutrient-item {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .nutrient-label {
+            display: block;
+            color: #718096;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .nutrient-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .light-bar {
+            height: 25px;
+            background: linear-gradient(90deg, #e2e8f0, #cbd5e0);
+            border-radius: 15px;
+            margin-top: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .light-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd89b, #19547b);
+            transition: width 1s ease-in-out;
+            border-radius: 15px;
+            position: relative;
+        }
+
+        .light-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .pump-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .pump-card {
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .pump-on {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .pump-off {
+            background: linear-gradient(135deg, #f8d7da, #f1b0b7);
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .pump-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .pump-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .pump-status {
+            font-size: 1.1rem;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .pump-on .pump-status {
+            background: #28a745;
+            color: white;
+        }
+
+        .pump-off .pump-status {
+            background: #dc3545;
+            color: white;
+        }
+
+        .data-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Override section-title emoji for image section */
+        .image-section .section-title {
+            justify-content: center;
+            width: 100%;
+            text-align: center;
+            font-size: 2rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+        }
+
+        .image-section .section-title::before {
+            content: "📷";
+            background: none;
+            -webkit-background-clip: initial;
+            -webkit-text-fill-color: initial;
+            background-clip: initial;
+            font-size: 2.4rem;
+            margin-right: 15px;
+            display: inline-block;
+            transform: translateY(-2px);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        table tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        table tr:hover {
+            background: #edf2f7;
+            transition: background 0.2s ease;
+        }
+
+        .tab-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .tab-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            border: none;
+            background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
+            color: #4a5568;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-color: #5a6fd8;
+        }
+
+        .chart-container {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .sensors-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .nutrient-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .pump-container {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            table th,
+            table td {
+                padding: 8px 6px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sensor-value {
+                font-size: 1.8rem;
+            }
+
+            .nutrient-value {
+                font-size: 1.1rem;
+            }
+
+            .pump-icon {
+                font-size: 2.5rem;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Soil sensor styles */
+        .soil-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .soil-item {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .soil-label {
+            display: block;
+            color: #718096;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .soil-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        /* Add styles for the refresh countdown */
+        .refresh-countdown {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-countdown::before {
+            content: "🔄";
+            font-size: 1.1rem;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-countdown.refreshing::before {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Alert styles */
+        #alertsContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+
+        .alert {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .alert.warning {
+            border-left: 4px solid #ffd700;
+        }
+
+        .alert-message {
+            margin-right: 15px;
+        }
+
+        .alert-close {
+            cursor: pointer;
+            font-size: 20px;
+            color: #666;
+        }
+
+        .alert-close:hover {
+            color: #333;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="alertsContainer"></div>
+    <div class="container fade-in">
+        <!-- Alerts Container -->
+        <div class="alerts-container" id="alertsContainer"></div>
+
+        <!-- Add logout header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <span style="color: #667eea; font-weight: 500; margin-bottom: 5px;">Welcome, {{ username }}!</span>
+                <span style="font-size: 0.9rem; color: #667eea;">Last updated: {{ last_updated }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" style="
+                background: linear-gradient(135deg, #ef4444, #dc2626);
+                color: white;
+                text-decoration: none;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 500;
+                font-size: 0.9rem;
+                transition: all 0.3s ease;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(239, 68, 68, 0.3)'" 
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                Logout
+            </a>
+        </div>
+
+        <h1>🌶️ Smart Chilli Farm Dashboard</h1>
+        
+        <div class="sensors-grid">
+            <!-- Temperature Card -->
+            <div class="sensor-card temperature">
+                <div class="sensor-header">
+                    <span class="sensor-icon">🌡️</span>
+                    <h3 class="sensor-title">Air Temperature</h3>
+                </div>
+                <div class="sensor-value">{{ temperature }}°C</div>
+            </div>
+
+            <!-- Humidity Card -->
+            <div class="sensor-card humidity">
+                <div class="sensor-header">
+                    <span class="sensor-icon">💧</span>
+                    <h3 class="sensor-title">Air Humidity</h3>
+                </div>
+                <div class="sensor-value">{{ humidity }}%</div>
+            </div>
+
+            <!-- Pressure Card -->
+            <div class="sensor-card pressure">
+                <div class="sensor-header">
+                    <span class="sensor-icon">🌪️</span>
+                    <h3 class="sensor-title">Air Pressure</h3>
+                </div>
+                <div class="sensor-value">{{ pressure }} hPa</div>
+            </div>
+
+            <!-- Light Card -->
+            <div class="sensor-card light">
+                <div class="sensor-header">
+                    <span class="sensor-icon">☀️</span>
+                    <h3 class="sensor-title">Light Intensity</h3>
+                </div>
+                <div class="sensor-value">{{ light }} lux</div>
+                <div class="light-bar">
+                    <div class="light-fill" style="width: {{ (light|float / 65535.0 * 100)|round|int if light != '—' else 0 }}%"></div>
+                </div>
+            </div>
+
+            <!-- Soil Conditions Card -->
+            <div class="sensor-card soil">
+                <div class="sensor-header">
+                    <span class="sensor-icon">🌱</span>
+                    <h3 class="sensor-title">Soil Conditions</h3>
+                </div>
+                <div class="soil-grid">
+                    <div class="soil-item">
+                        <span class="soil-label">Moisture</span>
+                        <div class="soil-value">{{ npk_soil_moisture }}%</div>
+                    </div>
+                    <div class="soil-item">
+                        <span class="soil-label">Temperature</span>
+                        <div class="soil-value">{{ npk_soil_temperature }}°C</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NPK Nutrients Card -->
+            <div class="sensor-card nutrients">
+                <div class="sensor-header">
+                    <span class="sensor-icon">🧪</span>
+                    <h3 class="sensor-title">NPK Nutrients</h3>
+                </div>
+                <div class="nutrient-grid">
+                    <div class="nutrient-item">
+                        <span class="nutrient-label">Nitrogen (N)</span>
+                        <div class="nutrient-value">{{ npk_nitrogen }} mg/kg</div>
+                    </div>
+                    <div class="nutrient-item">
+                        <span class="nutrient-label">Phosphorus (P)</span>
+                        <div class="nutrient-value">{{ npk_phosphorus }} mg/kg</div>
+                    </div>
+                    <div class="nutrient-item">
+                        <span class="nutrient-label">Potassium (K)</span>
+                        <div class="nutrient-value">{{ npk_potassium }} mg/kg</div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- Image Analysis Section -->
+        <div class="image-section" style="
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="section-title">Latest Plant Image</h2>
+                <button onclick="captureImage()" 
+                        style="padding: 10px 20px;
+                               border-radius: 10px;
+                               background: linear-gradient(135deg, #667eea, #764ba2);
+                               color: white;
+                               font-weight: 600;
+                               font-size: 1rem;
+                               border: none;
+                               cursor: pointer;
+                               transition: all 0.3s ease;
+                               display: flex;
+                               align-items: center;
+                               gap: 8px;
+                               box-shadow: 0 4px 6px rgba(102, 126, 234, 0.2);"
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(102, 126, 234, 0.3)'"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(102, 126, 234, 0.2)'">
+                    <span style="font-size: 1.2rem;">📸</span> Capture Image
+                </button>
+                </div>
+            {% if latest_image and latest_image.image_path %}
+            <div class="image-container" style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;">
+                <div class="plant-image" style="
+                    width: 100%;
+                    max-width: 600px;
+                    border-radius: 15px;
+                    overflow: hidden;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
+                    <img src="{{ url_for('static', filename='uploads/' + latest_image.image_path) }}" 
+                         alt="Latest Plant Image" 
+                         style="width: 100%;
+                                height: auto;
+                                display: block;
+                                border-radius: 15px;">
+                </div>
+                {% if latest_image.ml_result %}
+                <div class="ml-result" style="
+                    width: 100%;
+                    max-width: 600px;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #ffffff, #f8fafc);
+                    border-radius: 15px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    text-align: center;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 20px;
+                    flex-wrap: wrap;">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;">
+                        <span style="
+                            font-size: 1.2rem;
+                            font-weight: 600;
+                            background: linear-gradient(135deg, #667eea, #764ba2);
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                            background-clip: text;">
+                            ML Diagnosis:
+                        </span>
+                        <span style="
+                            font-size: 1.2rem;
+                            font-weight: 700;
+                            color: #2d3748;
+                            padding: 5px 15px;
+                            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+                            border-radius: 10px;
+                            border: 1px solid #e2e8f0;">
+                            {{ latest_image.ml_result }}
+                        </span>
+            </div>
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;">
+                        <span style="
+                            font-size: 1.1rem;
+                            font-weight: 600;
+                            background: linear-gradient(135deg, #667eea, #764ba2);
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                            background-clip: text;">
+                            Confidence:
+                        </span>
+                        <span style="
+                            font-size: 1.1rem;
+                            font-weight: 700;
+                            color: #2d3748;
+                            padding: 5px 15px;
+                            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+                            border-radius: 10px;
+                            border: 1px solid #e2e8f0;">
+                            {{ '%.2f'|format(latest_image.confidence|default(0)) }}%
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="no-image" style="
+                text-align: center;
+                padding: 40px 20px;
+                background: linear-gradient(135deg, #f7fafc, #edf2f7);
+                border-radius: 15px;
+                border: 2px dashed #e2e8f0;">
+                <h3 style="color: #2d3748; font-size: 1.3rem; margin-bottom: 10px;">No plant image available yet.</h3>
+                <p style="color: #4a5568;">Waiting for the first image from the camera...</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Pump Status -->
+        <div class="pump-container">
+            <div class="pump-card {{ 'pump-on' if pump_irrigation else 'pump-off' if pump_irrigation is not none else '' }}">
+                <div class="pump-icon">💧</div>
+                <h3 class="pump-title">Irrigation Pump</h3>
+                <div class="pump-status">{{ 'ON' if pump_irrigation else 'OFF' if pump_irrigation is not none else '-' }}</div>
+            </div>
+            <div class="pump-card {{ 'pump-on' if pump_fertilizer else 'pump-off' if pump_fertilizer is not none else '' }}">
+                <div class="pump-icon">🌱</div>
+                <h3 class="pump-title">Fertilizer Pump</h3>
+                <div class="pump-status">{{ 'ON' if pump_fertilizer else 'OFF' if pump_fertilizer is not none else '-' }}</div>
+            </div>
+        </div>
+
+        <!-- Data Export Section -->
+        <div class="data-section" style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px; padding: 20px;">
+            <form action="/export/pdf" method="get" style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="report_date" style="font-size: 1.1rem; color: #2d3748; font-weight: 600;">Select Day:</label>
+                    <input type="date" 
+                           id="report_date" 
+                           name="date" 
+                           value="{{ now }}" 
+                           required 
+                           style="padding: 8px 15px; 
+                                  border-radius: 10px; 
+                                  border: 2px solid #e2e8f0; 
+                                  font-size: 1rem; 
+                                  color: #4a5568;
+                                  background: white;
+                                  transition: all 0.3s ease;
+                                  cursor: pointer;"
+                           onmouseover="this.style.borderColor='#667eea'"
+                           onmouseout="this.style.borderColor='#e2e8f0'">
+                </div>
+                <button type="submit" 
+                        style="padding: 8px 20px;
+                               border-radius: 10px;
+                               background: linear-gradient(135deg, #667eea, #764ba2);
+                               color: white;
+                               font-weight: 600;
+                               font-size: 1rem;
+                               border: none;
+                               cursor: pointer;
+                               transition: all 0.3s ease;
+                               box-shadow: 0 4px 6px rgba(102, 126, 234, 0.2);"
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(102, 126, 234, 0.3)'"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(102, 126, 234, 0.2)'">
+                    Download PDF Report
+                </button>
+            </form>
+        </div>
+
+        <!-- Historical Data -->
+        <div class="data-section">
+            <h3 class="section-title">Recent Sensor Readings</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Air Temperature (°C)</th>
+                            <th>Air Humidity (%)</th>
+                            <th>Air Pressure (hPa)</th>
+                            <th>Light (lux)</th>
+                            <th>Soil Moisture (%)</th>
+                            <th>Soil Temperature (°C)</th>
+                            <th>Nitrogen (mg/kg)</th>
+                            <th>Phosphorus (mg/kg)</th>
+                            <th>Potassium (mg/kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reading in history %}
+                        <tr>
+                            <td>{{ reading.timestamp_display }}</td>
+                            <td>{{ reading.temperature }}</td>
+                            <td>{{ reading.humidity }}</td>
+                            <td>{{ reading.pressure }}</td>
+                            <td>{{ reading.light }}</td>
+                            <td>{{ reading.npk_soil_moisture }}</td>
+                            <td>{{ reading.npk_soil_temperature }}</td>
+                            <td>{{ reading.npk_nitrogen }}</td>
+                            <td>{{ reading.npk_phosphorus }}</td>
+                            <td>{{ reading.npk_potassium }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="tab-container">
+            <h3 class="section-title">Sensor Trends</h3>
+            
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="showChart('soilMoistureChartBox', this)">
+                    💧 Soil Moisture
+                </button>
+                <button class="tab-button" onclick="showChart('soilTempChartBox', this)">
+                    🌡️ Soil Temperature
+                </button>
+                <button class="tab-button" onclick="showChart('airHumidityChartBox', this)">
+                    💨 Air Humidity
+                </button>
+                <button class="tab-button" onclick="showChart('airTempChartBox', this)">
+                    🌡️ Air Temperature
+                </button>
+                <button class="tab-button" onclick="showChart('airPressureChartBox', this)">
+                    🌪️ Air Pressure
+                </button>
+                <button class="tab-button" onclick="showChart('npkChartBox', this)">
+                    🧪 NPK Levels
+                </button>
+                <button class="tab-button" onclick="showChart('lightChartBox', this)">
+                    ☀️ Light Intensity
+                </button>
+            </div>
+
+            <div class="chart-container" id="soilMoistureChartBox">
+                <canvas id="soilMoistureChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="soilTempChartBox" style="display: none;">
+                <canvas id="soilTempChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="airHumidityChartBox" style="display: none;">
+                <canvas id="airHumidityChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="airTempChartBox" style="display: none;">
+                <canvas id="airTempChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="airPressureChartBox" style="display: none;">
+                <canvas id="airPressureChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="npkChartBox" style="display: none;">
+                <canvas id="npkChart"></canvas>
+            </div>
+
+            <div class="chart-container" id="lightChartBox" style="display: none;">
+                <canvas id="lightChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Refresh Countdown -->
+    <div class="refresh-countdown">
+        Next refresh in <span id="countdown">30</span>s
+    </div>
+    
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Enhanced JavaScript -->
+    <script>
+        // Initialize countdown timer when window loads
+        window.onload = function() {
+            let timeLeft = 30;
+            const countdownElement = document.getElementById('countdown');
+            const refreshElement = document.querySelector('.refresh-countdown');
+
+            function updateCountdown() {
+                timeLeft -= 1;
+                countdownElement.textContent = timeLeft;
+                
+                if (timeLeft <= 5) {
+                    refreshElement.classList.add('refreshing');
+                }
+                
+                if (timeLeft <= 0) {
+                    refreshData(); // Call refresh when countdown reaches 0
+                    timeLeft = 30;
+                    refreshElement.classList.remove('refreshing');
+                }
+            }
+
+            // Start countdown immediately and update every second
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        };
+
+        // Add auto-refresh functionality
+        async function refreshData() {
+            const refreshElement = document.querySelector('.refresh-countdown');
+            refreshElement.classList.add('refreshing');
+            
+            try {
+                // Reload the page to get fresh data
+                window.location.reload();
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                refreshElement.classList.remove('refreshing');
+            }
+        }
+
+        // Get data from Flask
+        const sensorHistory = JSON.parse('{{ history | tojson | safe }}').reverse();
+
+        // Function to capture image
+        async function captureImage() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span style="font-size: 1.2rem;">⏳</span> Capturing...';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('http://192.168.43.131/capture');
+                if (!response.ok) throw new Error('Failed to capture image');
+                
+                // Wait a moment for the image to be processed
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Reload the page to show new image
+                window.location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to capture image. Please try again.');
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // Define sensor thresholds
+        const sensorThresholds = {
+            temperature: {
+                name: 'Air Temperature',
+                unit: '°C',
+                low: 18,
+                high: 35,
+                idealLow: 22,
+                idealHigh: 32
+            },
+            humidity: {
+                name: 'Air Humidity',
+                unit: '%',
+                low: 40,
+                high: 85,
+                idealLow: 50,
+                idealHigh: 75
+            },
+            pressure: {
+                name: 'Air Pressure',
+                unit: 'hPa',
+                low: 1000,
+                high: 1015,
+                idealLow: 1003,
+                idealHigh: 1012
+            },
+            light: {
+                name: 'Light Intensity',
+                unit: 'lux',
+                low: 15000,
+                high: 70000,
+                idealLow: 20000,
+                idealHigh: 60000
+            },
+            npk_soil_moisture: {
+                name: 'Soil Moisture',
+                unit: '%',
+                low: 45,
+                high: 65,
+                idealLow: 50,
+                idealHigh: 60
+            },
+            npk_soil_temperature: {
+                name: 'Soil Temperature',
+                unit: '°C',
+                low: 20,
+                high: 35,
+                idealLow: 25,
+                idealHigh: 32
+            },
+            npk_nitrogen: {
+                name: 'Nitrogen',
+                unit: 'mg/kg',
+                low: 40,
+                high: 100,
+                idealLow: 40,
+                idealHigh: 80
+            },
+            npk_phosphorus: {
+                name: 'Phosphorus',
+                unit: 'mg/kg',
+                low: 30,
+                high: 100,
+                idealLow: 30,
+                idealHigh: 80
+            },
+            npk_potassium: {
+                name: 'Potassium',
+                unit: 'mg/kg',
+                low: 150,
+                high: 300,
+                idealLow: 150,
+                idealHigh: 250
+            }
+        };
+
+        function checkCriticalValues() {
+            // Get current readings from the page
+            const currentReadings = {
+                temperature: parseFloat('{{ temperature }}'.replace('—', 'NaN')),
+                humidity: parseFloat('{{ humidity }}'.replace('—', 'NaN')),
+                pressure: parseFloat('{{ pressure }}'.replace('—', 'NaN')),
+                light: parseFloat('{{ light }}'.replace('—', 'NaN')),
+                npk_soil_moisture: parseFloat('{{ npk_soil_moisture }}'.replace('—', 'NaN')),
+                npk_soil_temperature: parseFloat('{{ npk_soil_temperature }}'.replace('—', 'NaN')),
+                npk_nitrogen: parseFloat('{{ npk_nitrogen }}'.replace('—', 'NaN')),
+                npk_phosphorus: parseFloat('{{ npk_phosphorus }}'.replace('—', 'NaN')),
+                npk_potassium: parseFloat('{{ npk_potassium }}'.replace('—', 'NaN'))
+            };
+
+            // Check ESP32 connection status
+            const isDisconnected = Object.values(currentReadings).every(value => isNaN(value));
+            if (isDisconnected) {
+                showAlert('⚠️ ESP32 Connection Lost - Please check your device connection', 'error');
+                return; // Don't check other values if disconnected
+            }
+
+            // Check each sensor value against its thresholds
+            for (const [key, threshold] of Object.entries(sensorThresholds)) {
+                const value = currentReadings[key];
+                if (isNaN(value)) continue;
+
+                if (value < threshold.low) {
+                    showAlert(`⚠️ ${threshold.name} is too low: ${value}${threshold.unit} (< ${threshold.low}${threshold.unit})`, 'warning');
+                } else if (value > threshold.high) {
+                    showAlert(`⚠️ ${threshold.name} is too high: ${value}${threshold.unit} (> ${threshold.high}${threshold.unit})`, 'warning');
+                }
+            }
+        }
+
+        function showAlert(message, type = 'warning') {
+            const alertsContainer = document.getElementById('alertsContainer');
+            if (!alertsContainer) return;
+
+            const alertElement = document.createElement('div');
+            alertElement.className = `alert ${type}`;
+            alertElement.innerHTML = `
+                <div class="alert-message">${message}</div>
+                <div class="alert-close" onclick="this.parentElement.remove()">×</div>
+            `;
+            
+            // Remove existing alert with the same message if it exists
+            const existingAlert = Array.from(alertsContainer.children)
+                .find(alert => alert.querySelector('.alert-message').textContent === message);
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            alertsContainer.appendChild(alertElement);
+            
+            // Auto-remove after 10 seconds only for non-error alerts
+            if (type !== 'error') {
+                setTimeout(() => {
+                    if (alertElement.parentElement) {
+                        alertElement.remove();
+                    }
+                }, 10000);
+            }
+        }
+
+        // Check values initially and every 30 seconds
+        checkCriticalValues();
+        setInterval(checkCriticalValues, 30000);
+
+        // Prepare chart data
+        const labels = sensorHistory.map(reading => 
+            new Date(reading.timestamp_iso).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            }));
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            family: 'Inter',
+                            size: 12,
+                            weight: '500'
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        font: {
+                            family: 'Inter',
+                            size: 11
+                        }
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        font: {
+                            family: 'Inter',
+                            size: 11
+                        }
+                    }
+                }
+            },
+            elements: {
+                point: {
+                    radius: 4,
+                    hoverRadius: 6
+                },
+                line: {
+                    tension: 0.4
+                }
+            }
+        };
+
+        // Create individual charts
+        new Chart(document.getElementById('soilMoistureChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Soil Moisture (%)',
+                    data: sensorHistory.map(reading => parseFloat(reading.npk_soil_moisture) || null),
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Moisture (%)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('soilTempChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Soil Temperature (°C)',
+                    data: sensorHistory.map(reading => parseFloat(reading.npk_soil_temperature) || null),
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('airHumidityChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Air Humidity (%)',
+                    data: sensorHistory.map(reading => parseFloat(reading.humidity) || null),
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Humidity (%)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('airTempChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Air Temperature (°C)',
+                    data: sensorHistory.map(reading => parseFloat(reading.temperature) || null),
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('airPressureChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Air Pressure (hPa)',
+                    data: sensorHistory.map(reading => parseFloat(reading.pressure) || null),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Pressure (hPa)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('npkChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Nitrogen (N)',
+                        data: sensorHistory.map(r => parseInt(r.npk_nitrogen) || null),
+                        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                        borderColor: '#22c55e',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Phosphorus (P)',
+                        data: sensorHistory.map(r => parseInt(r.npk_phosphorus) || null),
+                        backgroundColor: 'rgba(6, 182, 212, 0.8)',
+                        borderColor: '#06b6d4',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Potassium (K)',
+                        data: sensorHistory.map(r => parseInt(r.npk_potassium) || null),
+                        backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'mg/kg (Milligrams per Kilogram)',
+                            font: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('lightChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Light Intensity (lux)',
+                    data: sensorHistory.map(r => parseFloat(r.light) || null),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: chartOptions
+        });
+
+        function showChart(chartId, buttonElement) {
+            // Hide all charts
+            const charts = [
+                'soilMoistureChartBox',
+                'soilTempChartBox',
+                'airHumidityChartBox',
+                'airTempChartBox',
+                'airPressureChartBox',
+                'npkChartBox',
+                'lightChartBox'
+            ];
+            
+            charts.forEach(id => {
+                const element = document.getElementById(id);
+                element.style.display = 'none';
+            });
+            
+            // Show selected chart with animation
+            const selectedChart = document.getElementById(chartId);
+            selectedChart.style.display = 'block';
+            selectedChart.style.opacity = '0';
+            setTimeout(() => {
+                selectedChart.style.opacity = '1';
+                selectedChart.style.transition = 'opacity 0.3s ease';
+            }, 10);
+            
+            // Update active tab
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            buttonElement.classList.add('active');
+        }
+    </script>
+</body>
+</html>
